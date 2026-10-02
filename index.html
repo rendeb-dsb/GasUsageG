@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gas Usage</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      line-height: 1.4;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1a1a1a;
+      color: #fff;
+      padding: 10px 16px;
+    }
+    .app-title {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .app-title h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .version {
+      font-size: 0.7rem;
+      opacity: 0.75;
+      font-weight: 400;
+    }
+    .gear-btn {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    .gear-btn:hover {
+      opacity: 0.8;
+    }
+    main {
+      max-width: 640px;
+      margin: 20px auto;
+      padding: 0 16px;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .form-row {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    input:focus {
+      outline: none;
+      border-color: #0066cc;
+    }
+    .btn {
+      display: inline-block;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: #0066cc;
+      color: #fff;
+    }
+    .btn:hover {
+      background: #0052a3;
+    }
+    .btn-secondary {
+      background: #666;
+    }
+    .btn-secondary:hover {
+      background: #555;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 6px;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      font-weight: 600;
+      background: #fafafa;
+    }
+    .empty {
+      color: #888;
+      font-style: italic;
+      padding: 12px 0;
+    }
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show {
+      display: flex;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 320px;
+      width: 90%;
+      text-align: center;
+    }
+    .modal p {
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="app-title">
+      <h1>Gas Usage</h1>
+      <span class="version">b1v1</span>
+    </div>
+    <button class="gear-btn" id="gearBtn" title="Settings">⚙</button>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Add System Lookup Code</h2>
+      <form id="slcForm">
+        <div class="form-row">
+          <label for="groupCode">GroupCode (2 chars, uppercase)</label>
+          <input type="text" id="groupCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="e.g. ST">
+        </div>
+        <div class="form-row">
+          <label for="order">Order (whole number, unique within GroupCode)</label>
+          <input type="number" id="order" min="1" step="1" required placeholder="e.g. 1">
+        </div>
+        <div class="form-row">
+          <label for="valueCode">ValueCode (2 chars, uppercase)</label>
+          <input type="text" id="valueCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="e.g. 01">
+        </div>
+        <div class="form-row">
+          <label for="value">Value</label>
+          <input type="text" id="value" required placeholder="Display text">
+        </div>
+        <button type="submit" class="btn">Save</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Existing System Lookup Codes</h2>
+      <div id="listContainer">
+        <p class="empty">Loading…</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Gear modal -->
+  <div class="modal-overlay" id="gearModal">
+    <div class="modal">
+      <p>To be implemented.</p>
+      <button class="btn btn-secondary" id="closeModal">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const DB_NAME = 'GasUsageDB';
+    const DB_VERSION = 1;
+    const STORE = 'SystemLookupCodes';
+
+    let db = null;
+
+    // ---------- IndexedDB ----------
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (event) => {
+          const database = event.target.result;
+          if (!database.objectStoreNames.contains(STORE)) {
+            const store = database.createObjectStore(STORE, {
+              keyPath: 'SLCId',
+              autoIncrement: true
+            });
+            store.createIndex('byGroupCode', 'GroupCode', { unique: false });
+            // Compound unique index for GroupCode + Order
+            store.createIndex('byGroupOrder', ['GroupCode', 'Order'], { unique: true });
+          }
+        };
+
+        request.onsuccess = (event) => {
+          db = event.target.result;
+          resolve(db);
+        };
+
+        request.onerror = (event) => {
+          reject(event.target.error);
+        };
+      });
+    }
+
+    function addSLC(record) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        const request = store.add(record);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function getAllSLC() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const store = tx.objectStore(STORE);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    // ---------- UI ----------
+    async function refreshList() {
+      const container = document.getElementById('listContainer');
+      try {
+        const records = await getAllSLC();
+        if (records.length === 0) {
+          container.innerHTML = '<p class="empty">No records yet.</p>';
+          return;
+        }
+        // Sort by GroupCode then Order
+        records.sort((a, b) => {
+          if (a.GroupCode < b.GroupCode) return -1;
+          if (a.GroupCode > b.GroupCode) return 1;
+          return a.Order - b.Order;
+        });
+
+        let html = '<table><thead><tr><th>ID</th><th>Group</th><th>Order</th><th>Code</th><th>Value</th></tr></thead><tbody>';
+        for (const r of records) {
+          html += `<tr>
+            <td>${r.SLCId}</td>
+            <td>${r.GroupCode}</td>
+            <td>${r.Order}</td>
+            <td>${r.ValueCode}</td>
+            <td>${escapeHtml(r.Value)}</td>
+          </tr>`;
+        }
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      } catch (err) {
+        container.innerHTML = `<p class="empty">Error loading data: ${err.message}</p>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Form submit
+    document.getElementById('slcForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const groupCode = document.getElementById('groupCode').value.trim().toUpperCase();
+      const order = parseInt(document.getElementById('order').value, 10);
+      const valueCode = document.getElementById('valueCode').value.trim().toUpperCase();
+      const value = document.getElementById('value').value.trim();
+
+      if (groupCode.length !== 2 || valueCode.length !== 2) {
+        alert('GroupCode and ValueCode must be exactly 2 characters.');
+        return;
+      }
+
+      const record = {
+        GroupCode: groupCode,
+        Order: order,
+        ValueCode: valueCode,
+        Value: value
+      };
+
+      try {
+        await addSLC(record);
+        document.getElementById('slcForm').reset();
+        await refreshList();
+      } catch (err) {
+        if (err.name === 'ConstraintError') {
+          alert('A record with this GroupCode + Order already exists.');
+        } else {
+          alert('Error saving: ' + err.message);
+        }
+      }
+    });
+
+    // Force uppercase on the code fields
+    ['groupCode', 'valueCode'].forEach(id => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+      });
+    });
+
+    // Gear modal
+    const modal = document.getElementById('gearModal');
+    document.getElementById('gearBtn').addEventListener('click', () => {
+      modal.classList.add('show');
+    });
+    document.getElementById('closeModal').addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.remove('show');
+    });
+
+    // Init
+    openDB()
+      .then(() => refreshList())
+      .catch(err => {
+        document.getElementById('listContainer').innerHTML =
+          `<p class="empty">Failed to open database: ${err.message}</p>`;
+      });
+  </script>
+</body>
+</html>
