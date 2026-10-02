@@ -154,7 +154,7 @@
   <header>
     <div class="app-title">
       <h1>Gas Usage</h1>
-      <span class="version">b1v1</span>
+      <span class="version">b1v2</span>
     </div>
     <button class="gear-btn" id="gearBtn" title="Settings">⚙</button>
   </header>
@@ -179,7 +179,8 @@
           <label for="value">Value</label>
           <input type="text" id="value" required placeholder="Display text">
         </div>
-        <button type="submit" class="btn">Save</button>
+        <button type="submit" class="btn" id="saveBtn" disabled>Save</button>
+        <p id="dbStatus" class="empty" style="margin-top:10px;">Opening database…</p>
       </form>
     </div>
 
@@ -237,6 +238,10 @@
 
     function addSLC(record) {
       return new Promise((resolve, reject) => {
+        if (!db) {
+          reject(new Error('Database is not open yet. Reload the page and try again.'));
+          return;
+        }
         const tx = db.transaction(STORE, 'readwrite');
         const store = tx.objectStore(STORE);
         const request = store.add(record);
@@ -347,9 +352,18 @@
     });
 
     // Init
+    const saveBtn = document.getElementById('saveBtn');
+    const dbStatus = document.getElementById('dbStatus');
+
     openDB()
-      .then(() => refreshList())
+      .then(() => {
+        saveBtn.disabled = false;
+        dbStatus.textContent = 'Database ready.';
+        return refreshList();
+      })
       .catch(err => {
+        saveBtn.disabled = true;
+        dbStatus.textContent = 'Database failed to open: ' + err.message;
         document.getElementById('listContainer').innerHTML =
           `<p class="empty">Failed to open database: ${err.message}</p>`;
       });
