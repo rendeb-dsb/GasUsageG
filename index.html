@@ -62,7 +62,7 @@
     .submenu {
       display: none;
       position: absolute;
-      right: 0;
+      left: 0;
       top: 100%;
       margin-top: 4px;
       background: #fff;
@@ -73,6 +73,7 @@
       z-index: 50;
       overflow: hidden;
     }
+    nav.menubar .menu { position: relative; }
     .submenu.show { display: block; }
     .submenu button {
       display: block;
@@ -194,7 +195,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v15</span>
+    <span class="version">b1v16</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -255,7 +256,7 @@
         <h2>Existing System Lookup Codes</h2>
         <div style="margin-bottom:10px;">
           <button type="button" class="btn mini-btn" id="changeBtn" title="Change">•</button>
-          <button type="button" class="btn btn-secondary mini-btn" id="deleteBtn" title="Delete">−</button>
+          <button type="button" class="btn mini-btn" id="deleteBtn" title="Delete">−</button>
         </div>
         <div id="listContainer">
           <p class="empty">Loading…</p>
@@ -509,25 +510,40 @@
       const file = e.target.files[0];
       e.target.value = '';
       if (!file) return;
+      let backup = [];
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        const records = Array.isArray(data) ? data : data.records;
-        if (!Array.isArray(records)) throw new Error('JSON must be an array, or an object with a records array.');
-        if (!confirm('Replace all System Lookup Codes with ' + records.length + ' record(s) from this file?')) return;
+        const records = Array.isArray(data) ? data : (data.records || (data.SystemLookupCodes || null));
+        if (!Array.isArray(records)) throw new Error('JSON must contain a records array.');
+        const clean = records.map(r => ({
+          GroupCode: String(r.GroupCode || '').toUpperCase(),
+          Order: Number(r.Order),
+          ValueCode: String(r.ValueCode || '').toUpperCase(),
+          Value: String(r.Value || '')
+        }));
+        if (!confirm('Overlay System Lookup Codes with ' + clean.length + ' record(s) from this file?')) return;
+        backup = await getAllSLC();
         await clearStore();
-        for (const r of records) {
-          await addSLC({
-            GroupCode: String(r.GroupCode || '').toUpperCase(),
-            Order: Number(r.Order),
-            ValueCode: String(r.ValueCode || '').toUpperCase(),
-            Value: String(r.Value || '')
-          });
+        try {
+          for (const r of clean) await addSLC(r);
+        } catch (writeErr) {
+          await clearStore();
+          for (const old of backup) {
+            await addSLC({
+              GroupCode: old.GroupCode,
+              Order: old.Order,
+              ValueCode: old.ValueCode,
+              Value: old.Value
+            });
+          }
+          throw writeErr;
         }
         await refreshList();
-        alert('Imported ' + records.length + ' record(s).');
+        alert('Imported ' + clean.length + ' record(s).');
       } catch (err) {
-        alert('Import failed: ' + err.message);
+        alert('Import failed. Existing data was kept. ' + err.message);
+        await refreshList();
       }
     });
 
