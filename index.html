@@ -114,21 +114,28 @@
     .field input[type="number"] {
       width: 60px;
       max-width: 60px;
-      flex: 0 0 60px;
-      padding: 6px;
+      height: 36px;
+      min-height: 36px;
+      max-height: 36px;
+      flex: 0 0 auto;
+      padding: 4px 6px;
+      line-height: 1.2;
     }
+    .field.value-field { width: 100%; }
     .field.value-field input[type="text"] {
-      width: 160px;
-      max-width: 160px;
-      flex: 0 0 160px;
+      width: 100%;
+      max-width: 100%;
+      height: 36px;
+      min-height: 36px;
+      max-height: 36px;
     }
     .mini-btn {
-      width: 28px;
-      min-width: 28px;
-      height: 22px;
+      width: 35px;
+      min-width: 35px;
+      height: 35px;
       padding: 0;
-      font-size: 14px;
-      line-height: 20px;
+      font-size: 18px;
+      line-height: 35px;
       text-align: center;
     }
     input:focus { outline: none; border-color: #0066cc; }
@@ -175,7 +182,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v12</span>
+    <span class="version">b1v13</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
