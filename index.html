@@ -196,7 +196,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v17</span>
+    <span class="version">b1v18</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -211,6 +211,7 @@
       </div>
     </div>
     <button class="menu-btn" id="stationsBtn" type="button">Stations</button>
+    <button class="menu-btn" id="purchasesBtn" type="button">Purchases</button>
   </nav>
 
   <main>
@@ -274,11 +275,11 @@
           <div class="pair">
             <div class="field">
               <label for="stBrand">Brand</label>
-              <select id="stBrand" required style="width:90px;height:36px;"></select>
+              <select id="stBrand" required style="width:115px;height:36px;"></select>
             </div>
-            <div class="field value-field">
+            <div class="field value-field" style="margin-left:25px;">
               <label for="stName">Name</label>
-              <input type="text" id="stName" required>
+              <input type="text" id="stName" required style="width:calc(100% - 25px);max-width:calc(100% - 25px);">
             </div>
           </div>
           <div class="pair">
@@ -319,6 +320,54 @@
         <div id="stationList"><p class="empty">Loading…</p></div>
       </div>
     </div>
+
+    <div id="purchasesScreen" class="screen">
+      <div class="back-row">
+        <button class="btn btn-secondary" id="purchasesClose" type="button">Close</button>
+      </div>
+      <div class="card">
+        <h2>Manage Purchases</h2>
+        <form id="purchaseForm">
+          <div class="pair">
+            <div class="field">
+              <label for="pDate">Date</label>
+              <input type="text" id="pDate" maxlength="8" required pattern="[0-9]{8}" placeholder="mmddyyyy" style="width:90px;max-width:90px;">
+            </div>
+            <div class="field">
+              <label for="pCar">Car</label>
+              <select id="pCar" required style="width:100px;height:36px;"></select>
+            </div>
+            <div class="field">
+              <label for="pStation">Station</label>
+              <select id="pStation" required style="width:120px;height:36px;"></select>
+            </div>
+          </div>
+          <div class="pair">
+            <div class="field">
+              <label for="pGallons">Gallons</label>
+              <input type="number" id="pGallons" min="0" max="99.999" step="0.001" required style="width:80px;max-width:80px;">
+            </div>
+            <div class="field">
+              <label for="pPrice">Price</label>
+              <input type="number" id="pPrice" min="0" max="999.99" step="0.01" required style="width:80px;max-width:80px;">
+            </div>
+            <div class="field">
+              <label for="pCost">Cost</label>
+              <input type="number" id="pCost" min="0" max="999.99" step="0.01" required style="width:80px;max-width:80px;">
+            </div>
+          </div>
+          <button type="submit" class="btn" id="pSave" disabled>Save</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Existing Purchases</h2>
+        <div style="margin-bottom:10px;">
+          <button type="button" class="btn mini-btn" id="pChange" title="Change">•</button>
+          <button type="button" class="btn mini-btn" id="pDelete" title="Delete">−</button>
+        </div>
+        <div id="purchaseList"><p class="empty">Loading…</p></div>
+      </div>
+    </div>
   </main>
 
   <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -333,9 +382,10 @@
 
   <script>
     const DB_NAME = 'GasUsageG';
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     const STORE = 'SystemLookupCodes';
     const STATIONS = 'Stations';
+    const PURCHASES = 'Purchases';
     let db = null;
 
     function openDB() {
@@ -352,6 +402,10 @@
             const stations = database.createObjectStore(STATIONS, { keyPath: 'Id', autoIncrement: true });
             stations.createIndex('byBrand', 'Brand', { unique: true });
             stations.createIndex('byName', 'Name', { unique: true });
+          }
+          if (!database.objectStoreNames.contains(PURCHASES)) {
+            const purchases = database.createObjectStore(PURCHASES, { keyPath: 'Id', autoIncrement: true });
+            purchases.createIndex('byDate', 'PurchaseDate', { unique: false });
           }
         };
         request.onsuccess = (event) => { db = event.target.result; resolve(db); };
@@ -749,6 +803,132 @@
     });
     document.getElementById('stationsClose').addEventListener('click', () => showScreen('homeScreen'));
 
+    let selectedPurchaseId = null;
+    function addPurchase(record) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PURCHASES, 'readwrite');
+        const request = tx.objectStore(PURCHASES).add(record);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+    function updatePurchase(record) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PURCHASES, 'readwrite');
+        const request = tx.objectStore(PURCHASES).put(record);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+    function deletePurchase(id) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PURCHASES, 'readwrite');
+        const request = tx.objectStore(PURCHASES).delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+    function getAllPurchases() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(PURCHASES, 'readonly');
+        const request = tx.objectStore(PURCHASES).getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+    async function fillPurchaseLookups() {
+      const codes = await getAllSLC();
+      const cars = codes.filter(r => r.GroupCode === 'CR').sort((a, b) => a.Order - b.Order);
+      document.getElementById('pCar').innerHTML = cars.map(c => `<option value="${c.SLCId}">${escapeHtml(c.Value)}</option>`).join('');
+      const stations = await getAllStations();
+      document.getElementById('pStation').innerHTML = stations.map(s => `<option value="${s.Id}">${escapeHtml(s.Name)}</option>`).join('');
+    }
+    function readPurchase() {
+      return {
+        PurchaseDate: document.getElementById('pDate').value.trim(),
+        Car: Number(document.getElementById('pCar').value),
+        StationId: Number(document.getElementById('pStation').value),
+        Gallons: Number(document.getElementById('pGallons').value),
+        Price: Number(document.getElementById('pPrice').value),
+        Cost: Number(document.getElementById('pCost').value)
+      };
+    }
+    function purchaseValid(data) {
+      return /^\d{8}$/.test(data.PurchaseDate) && data.Car && data.StationId && data.Gallons <= 99.999 && data.Price <= 999.99 && data.Cost <= 999.99;
+    }
+    async function refreshPurchases() {
+      const container = document.getElementById('purchaseList');
+      const records = await getAllPurchases();
+      const codes = await getAllSLC();
+      const stations = await getAllStations();
+      if (!records.length) {
+        container.innerHTML = '<p class="empty">No purchases yet.</p>';
+        return;
+      }
+      records.sort((a, b) => String(b.PurchaseDate).localeCompare(String(a.PurchaseDate)));
+      let html = '<table><thead><tr><th></th><th>Id</th><th>Date</th><th>Car</th><th>Station</th><th>Gallons</th><th>Cost</th></tr></thead><tbody>';
+      for (const r of records) {
+        const car = codes.find(c => c.SLCId === r.Car);
+        const station = stations.find(s => s.Id === r.StationId);
+        html += `<tr><td><input class="row-pick" type="radio" name="pPick" value="${r.Id}"></td><td>${r.Id}</td><td>${r.PurchaseDate}</td><td>${car ? escapeHtml(car.Value) : r.Car}</td><td>${station ? escapeHtml(station.Name) : r.StationId}</td><td>${r.Gallons}</td><td>${r.Cost}</td></tr>`;
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+      container.querySelectorAll('input[name="pPick"]').forEach(el => {
+        el.addEventListener('change', () => {
+          const rec = records.find(r => r.Id === Number(el.value));
+          if (!rec) return;
+          selectedPurchaseId = rec.Id;
+          document.getElementById('pDate').value = rec.PurchaseDate;
+          document.getElementById('pCar').value = rec.Car;
+          document.getElementById('pStation').value = rec.StationId;
+          document.getElementById('pGallons').value = rec.Gallons;
+          document.getElementById('pPrice').value = rec.Price;
+          document.getElementById('pCost').value = rec.Cost;
+        });
+      });
+    }
+    document.getElementById('pDate').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); });
+    document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = readPurchase();
+      if (!purchaseValid(data)) { alert('Check date (mmddyyyy), car, station, and the amount limits.'); return; }
+      try {
+        await addPurchase(data);
+        document.getElementById('purchaseForm').reset();
+        selectedPurchaseId = null;
+        await refreshPurchases();
+      } catch (err) {
+        alert('Error saving: ' + err.message);
+      }
+    });
+    document.getElementById('pChange').addEventListener('click', async () => {
+      if (!selectedPurchaseId) { alert('Select a purchase first.'); return; }
+      const yes = await askConfirm('Are you sure you want to apply these changes?');
+      if (!yes) return;
+      const data = readPurchase();
+      if (!purchaseValid(data)) { alert('Check date (mmddyyyy), car, station, and the amount limits.'); return; }
+      await updatePurchase({ Id: selectedPurchaseId, ...data });
+      document.getElementById('purchaseForm').reset();
+      selectedPurchaseId = null;
+      await refreshPurchases();
+    });
+    document.getElementById('pDelete').addEventListener('click', async () => {
+      if (!selectedPurchaseId) { alert('Select a purchase first.'); return; }
+      const yes = await askConfirm('Are you sure you want to delete the selected record?');
+      if (!yes) return;
+      await deletePurchase(selectedPurchaseId);
+      document.getElementById('purchaseForm').reset();
+      selectedPurchaseId = null;
+      await refreshPurchases();
+    });
+    document.getElementById('purchasesBtn').addEventListener('click', async () => {
+      await fillPurchaseLookups();
+      await refreshPurchases();
+      showScreen('purchasesScreen');
+    });
+    document.getElementById('purchasesClose').addEventListener('click', () => showScreen('homeScreen'));
+
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
       document.getElementById(id).classList.add('active');
@@ -763,6 +943,7 @@
         saveBtn.disabled = false;
         dbStatus.textContent = '';
         document.getElementById('stSave').disabled = false;
+        document.getElementById('pSave').disabled = false;
         return refreshList();
       })
       .catch(err => {
