@@ -33,6 +33,15 @@
     .header-actions {
       display: flex;
       align-items: center;
+      margin-left: auto;
+    }
+    nav.menubar {
+      background: #2a2a2a;
+      padding: 6px 12px;
+    }
+    nav.menubar .menu-btn { font-size: 0.9rem; }
+      display: flex;
+      align-items: center;
       gap: 4px;
       margin-left: auto;
     }
@@ -145,19 +154,21 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v8</span>
+    <span class="version">b1v10</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
-      <div class="menu">
-        <button class="menu-btn" id="actionsBtn" type="button">Actions</button>
-        <div class="submenu" id="actionsMenu">
-          <button type="button" id="importBtn">Import</button>
-          <button type="button" id="exportBtn">Export</button>
-        </div>
-      </div>
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
     </div>
   </header>
+  <nav class="menubar">
+    <div class="menu">
+      <button class="menu-btn" id="actionsBtn" type="button">Actions</button>
+      <div class="submenu" id="actionsMenu">
+        <button type="button" id="importBtn">Import</button>
+        <button type="button" id="exportBtn">Export</button>
+      </div>
+    </div>
+  </nav>
 
   <main>
     <div id="homeScreen" class="screen active">
@@ -325,13 +336,6 @@
         function onNo() { done(false); }
         yes.addEventListener('click', onYes);
         no.addEventListener('click', onNo);
-      });
-    }
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        const request = tx.objectStore(STORE).clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
       });
     }
 
