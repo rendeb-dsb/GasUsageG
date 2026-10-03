@@ -138,7 +138,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v6</span>
+    <span class="version">b1v7</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <div class="menu">
@@ -167,21 +167,25 @@
       <div class="card">
         <h2>Add System Lookup Code</h2>
         <form id="slcForm">
-          <div class="form-row">
-            <label for="groupCode">GroupCode (2 chars, uppercase)</label>
-            <input type="text" id="groupCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="e.g. ST">
+          <div class="pair">
+            <div class="form-row narrow">
+              <label for="groupCode">GroupCode</label>
+              <input type="text" id="groupCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="ST">
+            </div>
+            <div class="form-row narrow">
+              <label for="order">Order</label>
+              <input type="number" id="order" min="1" step="1" required placeholder="1">
+            </div>
           </div>
-          <div class="form-row">
-            <label for="order">Order (whole number, unique within GroupCode)</label>
-            <input type="number" id="order" min="1" step="1" required placeholder="e.g. 1">
-          </div>
-          <div class="form-row">
-            <label for="valueCode">ValueCode (2 chars, uppercase)</label>
-            <input type="text" id="valueCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="e.g. 01">
-          </div>
-          <div class="form-row">
-            <label for="value">Value</label>
-            <input type="text" id="value" required placeholder="Display text">
+          <div class="pair">
+            <div class="form-row narrow">
+              <label for="valueCode">ValueCode</label>
+              <input type="text" id="valueCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="01">
+            </div>
+            <div class="form-row wide">
+              <label for="value">Value</label>
+              <input type="text" id="value" required placeholder="Display text">
+            </div>
           </div>
           <button type="submit" class="btn" id="saveBtn" disabled>Save</button>
           <p id="dbStatus" class="empty" style="margin-top:10px;">Opening database…</p>
@@ -257,9 +261,9 @@
           return;
         }
         records.sort((a, b) => a.GroupCode < b.GroupCode ? -1 : a.GroupCode > b.GroupCode ? 1 : a.Order - b.Order);
-        let html = '<table><thead><tr><th>ID</th><th>Group</th><th>Order</th><th>Code</th><th>Value</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th></th><th>ID</th><th>Group<br>Code</th><th>Order</th><th>Value<br>Code</th><th>Value</th></tr></thead><tbody>';
         for (const r of records) {
-          html += `<tr><td>${r.SLCId}</td><td>${r.GroupCode}</td><td>${r.Order}</td><td>${r.ValueCode}</td><td>${escapeHtml(r.Value)}</td></tr>`;
+          html += `<tr><td><input class="row-pick" type="radio" name="slcPick" value="${r.SLCId}"></td><td>${r.SLCId}</td><td>${r.GroupCode}</td><td>${r.Order}</td><td>${r.ValueCode}</td><td>${escapeHtml(r.Value)}</td></tr>`;
         }
         html += '</tbody></table>';
         container.innerHTML = html;
