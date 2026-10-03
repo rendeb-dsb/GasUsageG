@@ -39,7 +39,8 @@
       background: #2a2a2a;
       padding: 6px 12px;
     }
-    nav.menubar .menu-btn { font-size: 0.9rem; }
+    nav.menubar { display: flex; gap: 8px; align-items: center; }
+    .inline-save { align-self: flex-end; height: 36px; padding: 0 12px; }
       display: flex;
       align-items: center;
       gap: 4px;
@@ -195,7 +196,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v16</span>
+    <span class="version">b1v17</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -209,6 +210,7 @@
         <button type="button" id="exportBtn">Export</button>
       </div>
     </div>
+    <button class="menu-btn" id="stationsBtn" type="button">Stations</button>
   </nav>
 
   <main>
@@ -239,6 +241,7 @@
               <label for="valueCode">Value<br>Code</label>
               <input type="text" id="valueCode" maxlength="2" required pattern="[A-Z]{2}">
             </div>
+            <button type="submit" class="btn inline-save" id="saveBtn" disabled>Save</button>
           </div>
           <div class="pair">
             <div class="field value-field">
@@ -246,10 +249,7 @@
               <input type="text" id="value" required>
             </div>
           </div>
-          <div class="save-row">
-            <button type="submit" class="btn" id="saveBtn" disabled>Save</button>
-            <p id="dbStatus" class="empty"></p>
-          </div>
+          <p id="dbStatus" class="empty"></p>
         </form>
       </div>
       <div class="card">
@@ -261,6 +261,62 @@
         <div id="listContainer">
           <p class="empty">Loading…</p>
         </div>
+      </div>
+    </div>
+
+    <div id="stationsScreen" class="screen">
+      <div class="back-row">
+        <button class="btn btn-secondary" id="stationsClose" type="button">Close</button>
+      </div>
+      <div class="card">
+        <h2>Manage Stations</h2>
+        <form id="stationForm">
+          <div class="pair">
+            <div class="field">
+              <label for="stBrand">Brand</label>
+              <select id="stBrand" required style="width:90px;height:36px;"></select>
+            </div>
+            <div class="field value-field">
+              <label for="stName">Name</label>
+              <input type="text" id="stName" required>
+            </div>
+          </div>
+          <div class="pair">
+            <div class="field value-field">
+              <label for="stAddr1">Address1</label>
+              <input type="text" id="stAddr1" required>
+            </div>
+          </div>
+          <div class="pair">
+            <div class="field value-field">
+              <label for="stAddr2">Address2</label>
+              <input type="text" id="stAddr2">
+            </div>
+          </div>
+          <div class="pair">
+            <div class="field value-field">
+              <label for="stCity">City</label>
+              <input type="text" id="stCity" required>
+            </div>
+            <div class="field">
+              <label for="stState">State</label>
+              <input type="text" id="stState" maxlength="2" required pattern="[A-Z]{2}">
+            </div>
+            <div class="field">
+              <label for="stZip">Zip</label>
+              <input type="text" id="stZip" maxlength="5" required pattern="[0-9]{5}">
+            </div>
+          </div>
+          <button type="submit" class="btn" id="stSave" disabled>Save</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Existing Stations</h2>
+        <div style="margin-bottom:10px;">
+          <button type="button" class="btn mini-btn" id="stChange" title="Change">•</button>
+          <button type="button" class="btn mini-btn" id="stDelete" title="Delete">−</button>
+        </div>
+        <div id="stationList"><p class="empty">Loading…</p></div>
       </div>
     </div>
   </main>
@@ -277,8 +333,9 @@
 
   <script>
     const DB_NAME = 'GasUsageG';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
     const STORE = 'SystemLookupCodes';
+    const STATIONS = 'Stations';
     let db = null;
 
     function openDB() {
@@ -290,6 +347,11 @@
             const store = database.createObjectStore(STORE, { keyPath: 'SLCId', autoIncrement: true });
             store.createIndex('byGroupCode', 'GroupCode', { unique: false });
             store.createIndex('byGroupOrder', ['GroupCode', 'Order'], { unique: true });
+          }
+          if (!database.objectStoreNames.contains(STATIONS)) {
+            const stations = database.createObjectStore(STATIONS, { keyPath: 'Id', autoIncrement: true });
+            stations.createIndex('byBrand', 'Brand', { unique: true });
+            stations.createIndex('byName', 'Name', { unique: true });
           }
         };
         request.onsuccess = (event) => { db = event.target.result; resolve(db); };
@@ -547,6 +609,146 @@
       }
     });
 
+    let selectedStationId = null;
+
+    function addStation(record) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STATIONS, 'readwrite');
+        const request = tx.objectStore(STATIONS).add(record);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+    function updateStation(record) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STATIONS, 'readwrite');
+        const request = tx.objectStore(STATIONS).put(record);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+    function deleteStation(id) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STATIONS, 'readwrite');
+        const request = tx.objectStore(STATIONS).delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+    function getAllStations() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STATIONS, 'readonly');
+        const request = tx.objectStore(STATIONS).getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function fillBrands() {
+      const records = await getAllSLC();
+      const brands = records.filter(r => r.GroupCode === 'BR').sort((a, b) => a.Order - b.Order);
+      const sel = document.getElementById('stBrand');
+      sel.innerHTML = brands.map(b => `<option value="${b.SLCId}">${escapeHtml(b.Value)}</option>`).join('');
+      return brands;
+    }
+
+    async function refreshStations() {
+      const container = document.getElementById('stationList');
+      const records = await getAllStations();
+      const codes = await getAllSLC();
+      if (!records.length) {
+        container.innerHTML = '<p class="empty">No stations yet.</p>';
+        return;
+      }
+      records.sort((a, b) => String(a.Name).localeCompare(String(b.Name)));
+      let html = '<table><thead><tr><th></th><th>Id</th><th>Brand</th><th>Name</th><th>City</th><th>State</th></tr></thead><tbody>';
+      for (const r of records) {
+        const brand = codes.find(c => c.SLCId === r.Brand);
+        html += `<tr><td><input class="row-pick" type="radio" name="stPick" value="${r.Id}"></td><td>${r.Id}</td><td>${brand ? escapeHtml(brand.Value) : r.Brand}</td><td>${escapeHtml(r.Name)}</td><td>${escapeHtml(r.City)}</td><td>${r.State}</td></tr>`;
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+      container.querySelectorAll('input[name="stPick"]').forEach(el => {
+        el.addEventListener('change', () => {
+          const rec = records.find(r => r.Id === Number(el.value));
+          if (!rec) return;
+          selectedStationId = rec.Id;
+          document.getElementById('stBrand').value = rec.Brand;
+          document.getElementById('stName').value = rec.Name;
+          document.getElementById('stAddr1').value = rec.Address1;
+          document.getElementById('stAddr2').value = rec.Address2 || '';
+          document.getElementById('stCity').value = rec.City;
+          document.getElementById('stState').value = rec.State;
+          document.getElementById('stZip').value = rec.Zip;
+        });
+      });
+    }
+
+    function readStation() {
+      return {
+        Brand: Number(document.getElementById('stBrand').value),
+        Name: document.getElementById('stName').value.trim(),
+        Address1: document.getElementById('stAddr1').value.trim(),
+        Address2: document.getElementById('stAddr2').value.trim(),
+        City: document.getElementById('stCity').value.trim(),
+        State: document.getElementById('stState').value.trim().toUpperCase(),
+        Zip: document.getElementById('stZip').value.trim()
+      };
+    }
+
+    function clearStation() {
+      document.getElementById('stationForm').reset();
+      selectedStationId = null;
+    }
+
+    document.getElementById('stState').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+    document.getElementById('stZip').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
+
+    document.getElementById('stationForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = readStation();
+      if (!data.Brand || data.State.length !== 2 || !/^\d{5}$/.test(data.Zip)) {
+        alert('Brand, a 2-letter State, and a 5-digit Zip are required.');
+        return;
+      }
+      try {
+        await addStation(data);
+        clearStation();
+        await refreshStations();
+      } catch (err) {
+        alert(err.name === 'ConstraintError' ? 'Brand or Name is already used.' : 'Error saving: ' + err.message);
+      }
+    });
+
+    document.getElementById('stChange').addEventListener('click', async () => {
+      if (!selectedStationId) { alert('Select a station first.'); return; }
+      const yes = await askConfirm('Are you sure you want to apply these changes?');
+      if (!yes) return;
+      try {
+        await updateStation({ Id: selectedStationId, ...readStation() });
+        clearStation();
+        await refreshStations();
+      } catch (err) {
+        alert(err.name === 'ConstraintError' ? 'Brand or Name is already used.' : 'Change failed: ' + err.message);
+      }
+    });
+
+    document.getElementById('stDelete').addEventListener('click', async () => {
+      if (!selectedStationId) { alert('Select a station first.'); return; }
+      const yes = await askConfirm('Are you sure you want to delete the selected record?');
+      if (!yes) return;
+      await deleteStation(selectedStationId);
+      clearStation();
+      await refreshStations();
+    });
+
+    document.getElementById('stationsBtn').addEventListener('click', async () => {
+      await fillBrands();
+      await refreshStations();
+      showScreen('stationsScreen');
+    });
+    document.getElementById('stationsClose').addEventListener('click', () => showScreen('homeScreen'));
+
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
       document.getElementById(id).classList.add('active');
@@ -560,6 +762,7 @@
       .then(() => {
         saveBtn.disabled = false;
         dbStatus.textContent = '';
+        document.getElementById('stSave').disabled = false;
         return refreshList();
       })
       .catch(err => {
