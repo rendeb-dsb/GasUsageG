@@ -93,7 +93,19 @@
     .field.value-field input { width: 160px; }
     .save-row { display: flex; align-items: center; gap: 10px; }
     .save-row .empty { padding: 0; }
-    .mini-btn { padding: 0 2px; font-size: 0.55rem; line-height: 1; min-width: 14px; height: 14px; margin-right: 4px; }
+    .mini-btn {
+      width: 17px !important;
+      min-width: 17px !important;
+      max-width: 17px !important;
+      height: 17px !important;
+      padding: 0 !important;
+      margin-right: 6px;
+      font-size: 11px !important;
+      line-height: 1 !important;
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+    }
     .card {
       background: #fff;
       border-radius: 8px;
@@ -182,7 +194,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v14</span>
+    <span class="version">b1v15</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -235,7 +247,7 @@
           </div>
           <div class="save-row">
             <button type="submit" class="btn" id="saveBtn" disabled>Save</button>
-            <p id="dbStatus" class="empty">Opening database…</p>
+            <p id="dbStatus" class="empty"></p>
           </div>
         </form>
       </div>
@@ -531,7 +543,7 @@
     openDB()
       .then(() => {
         saveBtn.disabled = false;
-        dbStatus.textContent = 'Database ready.';
+        dbStatus.textContent = '';
         return refreshList();
       })
       .catch(err => {
