@@ -77,7 +77,14 @@
     }
     .submenu button:hover { background: #f0f0f0; }
     main { max-width: 640px; margin: 20px auto; padding: 0 16px; }
-    h2 { font-size: 1.1rem; margin-bottom: 12px; }
+    .pair { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .field { display: flex; align-items: center; gap: 6px; }
+    .field label { margin: 0; font-size: 0.75rem; line-height: 1.1; text-align: right; min-width: 38px; }
+    .field input { width: 52px; padding: 6px; }
+    .field.value-field input { width: 150px; }
+    .save-row { display: flex; align-items: center; gap: 10px; }
+    .save-row .empty { padding: 0; }
+    .mini-btn { padding: 2px 10px; font-size: 1rem; line-height: 1.2; margin-right: 6px; }
     .card {
       background: #fff;
       border-radius: 8px;
@@ -138,7 +145,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v7</span>
+    <span class="version">b1v8</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <div class="menu">
@@ -165,34 +172,40 @@
         <button class="btn btn-secondary" id="backBtn" type="button">Close</button>
       </div>
       <div class="card">
-        <h2>Add System Lookup Code</h2>
+        <h2>Manage System Lookup Code</h2>
         <form id="slcForm">
           <div class="pair">
-            <div class="form-row narrow">
-              <label for="groupCode">GroupCode</label>
-              <input type="text" id="groupCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="ST">
+            <div class="field">
+              <label for="groupCode">Group<br>Code</label>
+              <input type="text" id="groupCode" maxlength="2" required pattern="[A-Z]{2}">
             </div>
-            <div class="form-row narrow">
+            <div class="field">
               <label for="order">Order</label>
-              <input type="number" id="order" min="1" step="1" required placeholder="1">
+              <input type="number" id="order" min="1" step="1" required>
             </div>
           </div>
           <div class="pair">
-            <div class="form-row narrow">
-              <label for="valueCode">ValueCode</label>
-              <input type="text" id="valueCode" maxlength="2" required pattern="[A-Z]{2}" placeholder="01">
+            <div class="field">
+              <label for="valueCode">Value<br>Code</label>
+              <input type="text" id="valueCode" maxlength="2" required pattern="[A-Z]{2}">
             </div>
-            <div class="form-row wide">
+            <div class="field value-field">
               <label for="value">Value</label>
-              <input type="text" id="value" required placeholder="Display text">
+              <input type="text" id="value" required>
             </div>
           </div>
-          <button type="submit" class="btn" id="saveBtn" disabled>Save</button>
-          <p id="dbStatus" class="empty" style="margin-top:10px;">Opening database…</p>
+          <div class="save-row">
+            <button type="submit" class="btn" id="saveBtn" disabled>Save</button>
+            <p id="dbStatus" class="empty">Opening database…</p>
+          </div>
         </form>
       </div>
       <div class="card">
         <h2>Existing System Lookup Codes</h2>
+        <div style="margin-bottom:10px;">
+          <button type="button" class="btn mini-btn" id="changeBtn" title="Change">•</button>
+          <button type="button" class="btn btn-secondary mini-btn" id="deleteBtn" title="Delete">−</button>
+        </div>
         <div id="listContainer">
           <p class="empty">Loading…</p>
         </div>
@@ -201,6 +214,14 @@
   </main>
 
   <input type="file" id="importFile" accept="application/json,.json" hidden>
+
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+      <p id="confirmText"></p>
+      <button class="btn" id="confirmYes" type="button">Yes</button>
+      <button class="btn btn-secondary" id="confirmNo" type="button">No</button>
+    </div>
+  </div>
 
   <script>
     const DB_NAME = 'GasUsageG';
@@ -252,6 +273,68 @@
       });
     }
 
+    function updateSLC(record) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const request = tx.objectStore(STORE).put(record);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function deleteSLC(id) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const request = tx.objectStore(STORE).delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    let selectedId = null;
+
+    function readForm() {
+      return {
+        GroupCode: document.getElementById('groupCode').value.trim().toUpperCase(),
+        Order: parseInt(document.getElementById('order').value, 10),
+        ValueCode: document.getElementById('valueCode').value.trim().toUpperCase(),
+        Value: document.getElementById('value').value.trim()
+      };
+    }
+
+    function clearForm() {
+      document.getElementById('slcForm').reset();
+      selectedId = null;
+      document.querySelectorAll('input[name="slcPick"]').forEach(el => { el.checked = false; });
+    }
+
+    function askConfirm(message) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmText').textContent = message;
+        modal.classList.add('show');
+        const yes = document.getElementById('confirmYes');
+        const no = document.getElementById('confirmNo');
+        function done(value) {
+          modal.classList.remove('show');
+          yes.removeEventListener('click', onYes);
+          no.removeEventListener('click', onNo);
+          resolve(value);
+        }
+        function onYes() { done(true); }
+        function onNo() { done(false); }
+        yes.addEventListener('click', onYes);
+        no.addEventListener('click', onNo);
+      });
+    }
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const request = tx.objectStore(STORE).clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
     async function refreshList() {
       const container = document.getElementById('listContainer');
       try {
@@ -263,10 +346,21 @@
         records.sort((a, b) => a.GroupCode < b.GroupCode ? -1 : a.GroupCode > b.GroupCode ? 1 : a.Order - b.Order);
         let html = '<table><thead><tr><th></th><th>ID</th><th>Group<br>Code</th><th>Order</th><th>Value<br>Code</th><th>Value</th></tr></thead><tbody>';
         for (const r of records) {
-          html += `<tr><td><input class="row-pick" type="radio" name="slcPick" value="${r.SLCId}"></td><td>${r.SLCId}</td><td>${r.GroupCode}</td><td>${r.Order}</td><td>${r.ValueCode}</td><td>${escapeHtml(r.Value)}</td></tr>`;
+          html += `<tr><td><input class="row-pick" type="radio" name="slcPick" value="${r.SLCId}" ${selectedId === r.SLCId ? 'checked' : ''}></td><td>${r.SLCId}</td><td>${r.GroupCode}</td><td>${r.Order}</td><td>${r.ValueCode}</td><td>${escapeHtml(r.Value)}</td></tr>`;
         }
         html += '</tbody></table>';
         container.innerHTML = html;
+        container.querySelectorAll('input[name="slcPick"]').forEach(el => {
+          el.addEventListener('change', () => {
+            const rec = records.find(r => r.SLCId === Number(el.value));
+            if (!rec) return;
+            selectedId = rec.SLCId;
+            document.getElementById('groupCode').value = rec.GroupCode;
+            document.getElementById('order').value = rec.Order;
+            document.getElementById('valueCode').value = rec.ValueCode;
+            document.getElementById('value').value = rec.Value;
+          });
+        });
       } catch (err) {
         container.innerHTML = `<p class="empty">Error loading data: ${err.message}</p>`;
       }
@@ -277,6 +371,37 @@
       div.textContent = str;
       return div.innerHTML;
     }
+
+    document.getElementById('changeBtn').addEventListener('click', async () => {
+      if (!selectedId) { alert('Select a record first.'); return; }
+      const data = readForm();
+      if (data.GroupCode.length !== 2 || data.ValueCode.length !== 2 || !data.Value || !data.Order) {
+        alert('Fill in all fields before changing.');
+        return;
+      }
+      const yes = await askConfirm('Are you sure you want to apply these changes?');
+      if (!yes) return;
+      try {
+        await updateSLC({ SLCId: selectedId, ...data });
+        clearForm();
+        await refreshList();
+      } catch (err) {
+        alert(err.name === 'ConstraintError' ? 'A record with this Group + Order already exists.' : 'Change failed: ' + err.message);
+      }
+    });
+
+    document.getElementById('deleteBtn').addEventListener('click', async () => {
+      if (!selectedId) { alert('Select a record first.'); return; }
+      const yes = await askConfirm('Are you sure you want to delete the selected record?');
+      if (!yes) return;
+      try {
+        await deleteSLC(selectedId);
+        clearForm();
+        await refreshList();
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    });
 
     document.getElementById('slcForm').addEventListener('submit', async (e) => {
       e.preventDefault();
