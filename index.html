@@ -196,7 +196,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v18</span>
+    <span class="version">b1v19</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -331,7 +331,7 @@
           <div class="pair">
             <div class="field">
               <label for="pDate">Date</label>
-              <input type="text" id="pDate" maxlength="8" required pattern="[0-9]{8}" placeholder="mmddyyyy" style="width:90px;max-width:90px;">
+              <input type="text" id="pDate" maxlength="10" required style="width:110px;max-width:110px;">
             </div>
             <div class="field">
               <label for="pCar">Car</label>
@@ -345,7 +345,7 @@
           <div class="pair">
             <div class="field">
               <label for="pGallons">Gallons</label>
-              <input type="number" id="pGallons" min="0" max="99.999" step="0.001" required style="width:80px;max-width:80px;">
+              <input type="text" id="pGallons" inputmode="decimal" required style="width:80px;max-width:80px;" value="__.___">
             </div>
             <div class="field">
               <label for="pPrice">Price</label>
@@ -838,7 +838,7 @@
     }
     async function fillPurchaseLookups() {
       const codes = await getAllSLC();
-      const cars = codes.filter(r => r.GroupCode === 'CR').sort((a, b) => a.Order - b.Order);
+      const cars = codes.filter(r => r.ValueCode === 'CR').sort((a, b) => a.Order - b.Order);
       document.getElementById('pCar').innerHTML = cars.map(c => `<option value="${c.SLCId}">${escapeHtml(c.Value)}</option>`).join('');
       const stations = await getAllStations();
       document.getElementById('pStation').innerHTML = stations.map(s => `<option value="${s.Id}">${escapeHtml(s.Name)}</option>`).join('');
@@ -848,13 +848,13 @@
         PurchaseDate: document.getElementById('pDate').value.trim(),
         Car: Number(document.getElementById('pCar').value),
         StationId: Number(document.getElementById('pStation').value),
-        Gallons: Number(document.getElementById('pGallons').value),
+        Gallons: Number(String(document.getElementById('pGallons').value).replace(/_/g, '0')),
         Price: Number(document.getElementById('pPrice').value),
         Cost: Number(document.getElementById('pCost').value)
       };
     }
     function purchaseValid(data) {
-      return /^\d{8}$/.test(data.PurchaseDate) && data.Car && data.StationId && data.Gallons <= 99.999 && data.Price <= 999.99 && data.Cost <= 999.99;
+      return /^\d{2}\/\d{2}\/\d{4}$/.test(data.PurchaseDate) && data.Car && data.StationId && data.Gallons <= 35 && data.Price <= 999.99 && data.Cost <= 999.99;
     }
     async function refreshPurchases() {
       const container = document.getElementById('purchaseList');
@@ -879,16 +879,98 @@
           const rec = records.find(r => r.Id === Number(el.value));
           if (!rec) return;
           selectedPurchaseId = rec.Id;
-          document.getElementById('pDate').value = rec.PurchaseDate;
+          document.getElementById('pDate').value = toDateMask(rec.PurchaseDate);
           document.getElementById('pCar').value = rec.Car;
           document.getElementById('pStation').value = rec.StationId;
-          document.getElementById('pGallons').value = rec.Gallons;
+          document.getElementById('pGallons').value = Number(rec.Gallons).toFixed(3);
           document.getElementById('pPrice').value = rec.Price;
           document.getElementById('pCost').value = rec.Cost;
+          document.getElementById('pCost').style.color = 'black';
         });
       });
     }
-    document.getElementById('pDate').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); });
+    function todayMask() {
+      const d = new Date();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return mm + '/' + dd + '/' + d.getFullYear();
+    }
+    function toDateMask(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      if (digits.length === 8 && value.indexOf('/') === -1) return digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+      return todayMask();
+    }
+    function datePart(pos) {
+      if (pos <= 2) return [0, 2];
+      if (pos <= 5) return [3, 5];
+      return [6, 10];
+    }
+    const pDate = document.getElementById('pDate');
+    pDate.value = todayMask();
+    pDate.addEventListener('keydown', (e) => {
+      const start = pDate.selectionStart;
+      const end = pDate.selectionEnd;
+      if (e.key === '/') { e.preventDefault(); return; }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        const [a, b] = datePart(start);
+        const chars = pDate.value.split('');
+        const from = e.key === 'Backspace' ? Math.max(a, start - 1) : start;
+        const to = end > start ? Math.min(b, end) : Math.min(b, from + 1);
+        for (let i = from; i < to; i++) if (chars[i] !== '/') chars[i] = '0';
+        pDate.value = chars.join('');
+        pDate.setSelectionRange(from, from);
+        return;
+      }
+      if (!/^\d$/.test(e.key)) return;
+      e.preventDefault();
+      const [a, b] = datePart(start);
+      const chars = pDate.value.split('');
+      let pos = start;
+      if (pos < a || pos >= b || chars[pos] === '/') pos = a;
+      chars[pos] = e.key;
+      pDate.value = chars.join('');
+      const next = pos + 1 >= b ? b : pos + 1;
+      pDate.setSelectionRange(next, next);
+    });
+    pDate.addEventListener('input', () => {
+      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(pDate.value)) pDate.value = todayMask();
+    });
+
+    const pGallons = document.getElementById('pGallons');
+    function gallonMask(raw) {
+      const digits = String(raw || '').replace(/\D/g, '').slice(0, 5);
+      const left = (digits.slice(0, 2) || '__').padEnd(2, '_');
+      const right = (digits.slice(2) || '___').padEnd(3, '_');
+      return left + '.' + right;
+    }
+    pGallons.addEventListener('focus', () => {
+      if (!pGallons.value || pGallons.value === '__.___') pGallons.value = '__.___';
+    });
+    pGallons.addEventListener('keydown', (e) => {
+      if (e.key === '.') { e.preventDefault(); pGallons.setSelectionRange(3, 3); return; }
+      if (e.key === 'Backspace' || e.key === 'Delete' || /^\d$/.test(e.key)) {
+        e.preventDefault();
+        let digits = pGallons.value.replace(/\D/g, '');
+        if (e.key === 'Backspace' || e.key === 'Delete') digits = digits.slice(0, -1);
+        else digits = (digits + e.key).slice(0, 5);
+        let num = digits.length ? Number(digits.slice(0, 2) + '.' + (digits.slice(2) || '0')) : 0;
+        if (num > 35) digits = '35000';
+        pGallons.value = digits ? gallonMask(digits) : '__.___';
+      }
+    });
+
+    const pCost = document.getElementById('pCost');
+    pCost.addEventListener('focus', () => {
+      const g = Number(String(pGallons.value).replace(/_/g, '0'));
+      const price = Number(document.getElementById('pPrice').value);
+      if (!isNaN(g) && !isNaN(price)) {
+        pCost.value = Math.min(999.99, g * price).toFixed(2);
+        pCost.style.color = 'green';
+      }
+    });
+    pCost.addEventListener('input', () => { pCost.style.color = 'black'; });
     document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = readPurchase();
