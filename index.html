@@ -196,7 +196,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v22</span>
+    <span class="version">b1v23</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -331,7 +331,7 @@
           <div class="pair">
             <div class="field">
               <label for="pDate">Date</label>
-              <input type="date" id="pDate" required style="width:150px;max-width:150px;height:36px;">
+              <input type="text" id="pDate" maxlength="10" required inputmode="numeric" value="__/__/____" style="width:110px;max-width:110px;height:36px;">
             </div>
             <div class="field">
               <label for="pCar">Car</label>
@@ -850,7 +850,7 @@
     }
     function readPurchase() {
       return {
-        PurchaseDate: toDisplayDate(document.getElementById('pDate').value),
+        PurchaseDate: document.getElementById('pDate').value.trim(),
         Car: Number(document.getElementById('pCar').value),
         StationId: Number(document.getElementById('pStation').value),
         Gallons: Number(String(document.getElementById('pGallons').value).replace(/_/g, '0')),
@@ -859,7 +859,7 @@
       };
     }
     function purchaseValid(data) {
-      return /^\d{2}\/\d{2}\/\d{4}$/.test(data.PurchaseDate) && data.Car && data.StationId && data.Gallons <= 35 && data.Price <= 999.99 && data.Cost <= 999.99;
+      return /^\d{2}\/\d{2}\/\d{4}$/.test(data.PurchaseDate) && data.PurchaseDate.indexOf('_') === -1 && data.Car && data.StationId && data.Gallons <= 35 && data.Price <= 999.99 && data.Cost <= 999.99;
     }
     async function refreshPurchases() {
       const container = document.getElementById('purchaseList');
@@ -884,7 +884,7 @@
           const rec = records.find(r => r.Id === Number(el.value));
           if (!rec) return;
           selectedPurchaseId = rec.Id;
-          document.getElementById('pDate').value = toInputDate(rec.PurchaseDate);
+          document.getElementById('pDate').value = dateMask(rec.PurchaseDate);
           document.getElementById('pCar').value = rec.Car;
           document.getElementById('pStation').value = rec.StationId;
           document.getElementById('pGallons').value = Number(rec.Gallons).toFixed(3);
@@ -894,14 +894,39 @@
         });
       });
     }
-    function toInputDate(value) {
-      const m = String(value || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-      return m ? m[3] + '-' + m[1] + '-' + m[2] : '';
+    function dateMask(value) {
+      const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+      const mm = (digits.slice(0, 2) || '__').padEnd(2, '_');
+      const dd = (digits.slice(2, 4) || '__').padEnd(2, '_');
+      const yyyy = (digits.slice(4, 8) || '____').padEnd(4, '_');
+      return mm + '/' + dd + '/' + yyyy;
     }
-    function toDisplayDate(value) {
-      const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      return m ? m[2] + '/' + m[3] + '/' + m[1] : '';
+    function dateCaret(masked) {
+      const i = masked.indexOf('_');
+      return i === -1 ? masked.length : i;
     }
+    const pDate = document.getElementById('pDate');
+    pDate.value = '__/__/____';
+    function placeDateCaret() {
+      const pos = dateCaret(pDate.value);
+      pDate.setSelectionRange(pos, pos);
+    }
+    pDate.addEventListener('focus', () => {
+      pDate.value = dateMask(pDate.value);
+      setTimeout(placeDateCaret, 0);
+    });
+    pDate.addEventListener('click', () => setTimeout(placeDateCaret, 0));
+    pDate.addEventListener('keydown', (e) => {
+      if (e.key === '/' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); placeDateCaret(); return; }
+      if (e.key === 'Backspace' || e.key === 'Delete' || /^\d$/.test(e.key)) {
+        e.preventDefault();
+        let digits = pDate.value.replace(/\D/g, '');
+        if (e.key === 'Backspace' || e.key === 'Delete') digits = digits.slice(0, -1);
+        else digits = (digits + e.key).slice(0, 8);
+        pDate.value = dateMask(digits);
+        placeDateCaret();
+      }
+    });
 
     const pGallons = document.getElementById('pGallons');
     function gallonMask(raw) {
