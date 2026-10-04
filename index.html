@@ -196,7 +196,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v25</span>
+    <span class="version">b1v26</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -342,21 +342,21 @@
               <select id="pStation" required style="width:120px;height:36px;"></select>
             </div>
           </div>
-          <div class="pair">
+          <div class="pair" id="amountRow">
             <div class="field">
               <label for="pGallons">Gallons</label>
-              <input type="number" id="pGallons" min="0" max="99.998" step="0.001" required style="width:90px;max-width:90px;">
+              <input type="number" id="pGallons" min="0" max="99.998" step="0.001" required style="width:70px;max-width:70px;">
             </div>
-            <div class="field">
+            <div class="field" style="margin-left:-20px;">
               <label for="pPrice">Price</label>
-              <input type="number" id="pPrice" min="0" max="9.998" step="0.001" required style="width:80px;max-width:80px;">
+              <input type="number" id="pPrice" min="0" max="9.998" step="0.001" required style="width:60px;max-width:60px;">
             </div>
-            <div class="field">
+            <button type="submit" class="btn" id="pSave" disabled style="margin-left:auto;align-self:flex-end;height:36px;">Save</button>
+            <div class="field" style="margin-left:-40px;">
               <label for="pCost">Cost</label>
-              <input type="text" id="pCost" inputmode="decimal" required style="width:90px;max-width:90px;">
+              <input type="text" id="pCost" inputmode="decimal" required style="width:70px;max-width:70px;">
             </div>
           </div>
-          <button type="submit" class="btn" id="pSave" disabled>Save</button>
         </form>
       </div>
       <div class="card">
@@ -365,7 +365,7 @@
           <button type="button" class="btn mini-btn" id="pChange" title="Change">•</button>
           <button type="button" class="btn mini-btn" id="pDelete" title="Delete">−</button>
         </div>
-        <div id="purchaseList"><p class="empty">Loading…</p></div>
+        <div id="purchaseList" style="overflow-x:auto;"><p class="empty">Loading…</p></div>
       </div>
     </div>
   </main>
@@ -871,11 +871,12 @@
         return;
       }
       records.sort((a, b) => String(b.PurchaseDate).localeCompare(String(a.PurchaseDate)));
-      let html = '<table><thead><tr><th></th><th>Id</th><th>Date</th><th>Car</th><th>Station</th><th>Gallons</th><th>Cost</th></tr></thead><tbody>';
+      let html = '<table style="min-width:520px;"><thead><tr><th></th><th>Date</th><th>Car</th><th>Station</th><th>Gallons</th><th>Price</th><th>Cost</th></tr></thead><tbody>';
       for (const r of records) {
         const car = codes.find(c => c.SLCId === r.Car);
         const station = stations.find(s => s.Id === r.StationId);
-        html += `<tr><td><input class="row-pick" type="radio" name="pPick" value="${r.Id}"></td><td>${r.Id}</td><td>${r.PurchaseDate}</td><td>${car ? escapeHtml(car.Value) : r.Car}</td><td>${station ? escapeHtml(station.Name) : r.StationId}</td><td>${r.Gallons}</td><td>${r.Cost}</td></tr>`;
+        const shortDate = String(r.PurchaseDate).replace(/^(\d{2}\/\d{2}\/)(\d{2})(\d{2})$/, '$1$3');
+        html += `<tr><td><input class="row-pick" type="radio" name="pPick" value="${r.Id}"></td><td>${shortDate}</td><td>${car ? escapeHtml(car.Value) : r.Car}</td><td>${station ? escapeHtml(station.Name) : r.StationId}</td><td>${r.Gallons}</td><td>${r.Price}</td><td>${r.Cost}</td></tr>`;
       }
       html += '</tbody></table>';
       container.innerHTML = html;
