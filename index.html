@@ -196,7 +196,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v19</span>
+    <span class="version">b1v20</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -838,8 +838,13 @@
     }
     async function fillPurchaseLookups() {
       const codes = await getAllSLC();
-      const cars = codes.filter(r => r.ValueCode === 'CR').sort((a, b) => a.Order - b.Order);
-      document.getElementById('pCar').innerHTML = cars.map(c => `<option value="${c.SLCId}">${escapeHtml(c.Value)}</option>`).join('');
+      const cars = codes
+        .filter(r => String(r.GroupCode || '').trim().toUpperCase() === 'CR')
+        .sort((a, b) => Number(a.Order) - Number(b.Order));
+      const carSel = document.getElementById('pCar');
+      carSel.innerHTML = cars.length
+        ? cars.map(c => `<option value="${c.SLCId}">${escapeHtml(c.Value)}</option>`).join('')
+        : '<option value="">No CR codes</option>';
       const stations = await getAllStations();
       document.getElementById('pStation').innerHTML = stations.map(s => `<option value="${s.Id}">${escapeHtml(s.Name)}</option>`).join('');
     }
