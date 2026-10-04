@@ -196,7 +196,7 @@
 </head>
 <body>
   <header>
-    <span class="version">b1v24</span>
+    <span class="version">b1v25</span>
     <span class="app-title">Gas Usage</span>
     <div class="header-actions">
       <button class="gear-btn" id="gearBtn" title="Settings" type="button">⚙</button>
@@ -331,7 +331,7 @@
           <div class="pair">
             <div class="field">
               <label for="pDate">Date</label>
-              <input type="text" id="pDate" maxlength="10" required inputmode="numeric" value="__/__/____" style="width:110px;max-width:110px;height:36px;">
+              <input type="date" id="pDate" required style="width:150px;max-width:150px;height:36px;">
             </div>
             <div class="field">
               <label for="pCar">Car</label>
@@ -345,15 +345,15 @@
           <div class="pair">
             <div class="field">
               <label for="pGallons">Gallons</label>
-              <input type="text" id="pGallons" inputmode="decimal" required style="width:80px;max-width:80px;" value="__.___">
+              <input type="number" id="pGallons" min="0" max="99.998" step="0.001" required style="width:90px;max-width:90px;">
             </div>
             <div class="field">
               <label for="pPrice">Price</label>
-              <input type="number" id="pPrice" min="0" max="999.99" step="0.01" required style="width:80px;max-width:80px;">
+              <input type="number" id="pPrice" min="0" max="9.998" step="0.001" required style="width:80px;max-width:80px;">
             </div>
             <div class="field">
               <label for="pCost">Cost</label>
-              <input type="number" id="pCost" min="0" max="999.99" step="0.01" required style="width:80px;max-width:80px;">
+              <input type="text" id="pCost" inputmode="decimal" required style="width:90px;max-width:90px;">
             </div>
           </div>
           <button type="submit" class="btn" id="pSave" disabled>Save</button>
@@ -850,16 +850,16 @@
     }
     function readPurchase() {
       return {
-        PurchaseDate: document.getElementById('pDate').value.trim(),
+        PurchaseDate: toDisplayDate(document.getElementById('pDate').value),
         Car: Number(document.getElementById('pCar').value),
         StationId: Number(document.getElementById('pStation').value),
-        Gallons: Number(String(document.getElementById('pGallons').value).replace(/_/g, '0')),
+        Gallons: Number(document.getElementById('pGallons').value),
         Price: Number(document.getElementById('pPrice').value),
         Cost: Number(document.getElementById('pCost').value)
       };
     }
     function purchaseValid(data) {
-      return /^\d{2}\/\d{2}\/\d{4}$/.test(data.PurchaseDate) && data.PurchaseDate.indexOf('_') === -1 && data.Car && data.StationId && data.Gallons <= 35 && data.Price <= 999.99 && data.Cost <= 999.99;
+      return /^\d{2}\/\d{2}\/\d{4}$/.test(data.PurchaseDate) && data.Car && data.StationId && data.Gallons > 0 && data.Gallons <= 99.998 && data.Price > 0 && data.Price <= 9.998 && data.Cost >= 0 && data.Cost <= 999.99;
     }
     async function refreshPurchases() {
       const container = document.getElementById('purchaseList');
@@ -884,82 +884,47 @@
           const rec = records.find(r => r.Id === Number(el.value));
           if (!rec) return;
           selectedPurchaseId = rec.Id;
-          document.getElementById('pDate').value = dateMask(rec.PurchaseDate);
+          document.getElementById('pDate').value = toInputDate(rec.PurchaseDate);
           document.getElementById('pCar').value = rec.Car;
           document.getElementById('pStation').value = rec.StationId;
           document.getElementById('pGallons').value = Number(rec.Gallons).toFixed(3);
-          document.getElementById('pPrice').value = rec.Price;
-          document.getElementById('pCost').value = rec.Cost;
+          document.getElementById('pPrice').value = Number(rec.Price).toFixed(3);
+          document.getElementById('pCost').value = Number(rec.Cost).toFixed(2).padStart(6, '0');
           document.getElementById('pCost').style.color = 'black';
         });
       });
     }
-    function dateMask(value) {
-      const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
-      const mm = (digits.slice(0, 2) || '__').padEnd(2, '_');
-      const dd = (digits.slice(2, 4) || '__').padEnd(2, '_');
-      const yyyy = (digits.slice(4, 8) || '____').padEnd(4, '_');
-      return mm + '/' + dd + '/' + yyyy;
+    function toInputDate(value) {
+      const m = String(value || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      return m ? m[3] + '-' + m[1] + '-' + m[2] : '';
     }
-    function dateCaret(masked) {
-      const i = masked.indexOf('_');
-      return i === -1 ? masked.length : i;
+    function toDisplayDate(value) {
+      const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? m[2] + '/' + m[3] + '/' + m[1] : '';
     }
-    const pDate = document.getElementById('pDate');
-    pDate.value = '__/__/____';
-    function placeDateCaret() {
-      const pos = dateCaret(pDate.value);
-      pDate.setSelectionRange(pos, pos);
+    function todayInput() {
+      const d = new Date();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return d.getFullYear() + '-' + mm + '-' + dd;
     }
-    pDate.addEventListener('focus', () => {
-      pDate.value = dateMask(pDate.value);
-      setTimeout(placeDateCaret, 0);
-    });
-    pDate.addEventListener('click', () => setTimeout(placeDateCaret, 0));
-    pDate.addEventListener('keydown', (e) => {
-      if (e.key === '/' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); placeDateCaret(); return; }
-      if (e.key === 'Backspace' || e.key === 'Delete' || /^\d$/.test(e.key)) {
-        e.preventDefault();
-        let digits = pDate.value.replace(/\D/g, '');
-        if (e.key === 'Backspace' || e.key === 'Delete') digits = digits.slice(0, -1);
-        else digits = (digits + e.key).slice(0, 8);
-        pDate.value = dateMask(digits);
-        placeDateCaret();
-      }
-    });
+    document.getElementById('pDate').value = todayInput();
 
     const pGallons = document.getElementById('pGallons');
-    function gallonMask(raw) {
-      const digits = String(raw || '').replace(/\D/g, '').slice(0, 5);
-      const left = (digits.slice(0, 2) || '__').padEnd(2, '_');
-      const right = (digits.slice(2) || '___').padEnd(3, '_');
-      return left + '.' + right;
-    }
-    pGallons.addEventListener('focus', () => {
-      if (!pGallons.value || pGallons.value === '__.___') pGallons.value = '__.___';
-    });
-    pGallons.addEventListener('keydown', (e) => {
-      if (e.key === '.') { e.preventDefault(); pGallons.setSelectionRange(3, 3); return; }
-      if (e.key === 'Backspace' || e.key === 'Delete' || /^\d$/.test(e.key)) {
-        e.preventDefault();
-        let digits = pGallons.value.replace(/\D/g, '');
-        if (e.key === 'Backspace' || e.key === 'Delete') digits = digits.slice(0, -1);
-        else digits = (digits + e.key).slice(0, 5);
-        let num = digits.length ? Number(digits.slice(0, 2) + '.' + (digits.slice(2) || '0')) : 0;
-        if (num > 35) digits = '35000';
-        pGallons.value = digits ? gallonMask(digits) : '__.___';
-      }
-    });
-
+    const pPrice = document.getElementById('pPrice');
     const pCost = document.getElementById('pCost');
-    pCost.addEventListener('focus', () => {
-      const g = Number(String(pGallons.value).replace(/_/g, '0'));
-      const price = Number(document.getElementById('pPrice').value);
-      if (!isNaN(g) && !isNaN(price)) {
-        pCost.value = Math.min(999.99, g * price).toFixed(2);
-        pCost.style.color = 'green';
-      }
-    });
+    function fillCost() {
+      const g = Number(pGallons.value);
+      const price = Number(pPrice.value);
+      if (!(g > 0) || g > 99.998 || !(price > 0) || price > 9.998) return;
+      pGallons.value = g.toFixed(3);
+      pPrice.value = price.toFixed(3);
+      const cost = Math.min(999.99, g * price);
+      pCost.value = cost.toFixed(2).padStart(6, '0');
+      pCost.style.color = 'green';
+    }
+    pGallons.addEventListener('blur', fillCost);
+    pPrice.addEventListener('blur', fillCost);
     pCost.addEventListener('input', () => { pCost.style.color = 'black'; });
     document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
       e.preventDefault();
